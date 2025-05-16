@@ -1,0 +1,16 @@
+# Terraform state and backup
+terraform.tfstate
+terraform.tfstate.*
+
+# Terraform provider lock file
+.terraform.lock.hcl
+
+# Terraform working directory
+.terraform/
+
+# Local environment files
+.env
+.env.*
+
+# Terraform plan files
+*.tfplan 

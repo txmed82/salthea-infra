@@ -1,0 +1,13 @@
+{
+  "name": "cosmos-db-test",
+  "version": "1.0.0",
+  "description": "Test script for Azure Cosmos DB connection",
+  "main": "cosmos_test.js",
+  "scripts": {
+    "test": "node cosmos_test.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.1",
+    "mongodb": "^6.3.0"
+  }
+} 

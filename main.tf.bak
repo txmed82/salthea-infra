@@ -1,0 +1,792 @@
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.90.0"
+    }
+  }
+  required_version = ">= 1.3.0"
+
+  # Uncomment this for remote state backend
+  # backend "azurerm" {
+  #   resource_group_name  = "salthea-tfstate-rg"
+  #   storage_account_name = "saltheatfstate"
+  #   container_name       = "tfstate"
+  #   key                  = "terraform.tfstate"
+  # }
+}
+
+provider "azurerm" {
+  features {}
+  subscription_id = var.subscription_id
+}
+
+data "azurerm_client_config" "current" {}
+
+# ------------------------------
+# Resource Group
+# ------------------------------
+resource "azurerm_resource_group" "salthea_rg" {
+  name     = var.resource_group_name
+  location = var.location
+
+  tags = {
+    environment = var.environment
+    project     = var.project_name
+    hipaa       = var.hipaa_compliant ? "true" : "false"
+  }
+}
+
+# ------------------------------
+# Virtual Network for Improved Security
+# ------------------------------
+resource "azurerm_virtual_network" "salthea_vnet" {
+  name                = "salthea-vnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+  }
+}
+
+resource "azurerm_subnet" "backend_subnet" {
+  name                 = "backend-subnet"
+  resource_group_name  = azurerm_resource_group.salthea_rg.name
+  virtual_network_name = azurerm_virtual_network.salthea_vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+  service_endpoints    = ["Microsoft.KeyVault", "Microsoft.AzureCosmosDB", "Microsoft.Storage"]
+
+  delegation {
+    name = "delegation"
+
+    service_delegation {
+      name    = "Microsoft.Web/serverFarms"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
+}
+
+resource "azurerm_network_security_group" "backend_nsg" {
+  name                = "backend-nsg"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+  }
+}
+
+resource "azurerm_subnet_network_security_group_association" "backend_nsg_association" {
+  subnet_id                 = azurerm_subnet.backend_subnet.id
+  network_security_group_id = azurerm_network_security_group.backend_nsg.id
+}
+
+# ------------------------------
+# App Service Plan
+# ------------------------------
+resource "azurerm_service_plan" "salthea_plan" {
+  name                = "salthea-app-plan"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  os_type             = "Linux"
+  sku_name            = "B1" # Use P1V2 for production
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+  }
+}
+
+# ------------------------------
+# Azure Key Vault
+# ------------------------------
+resource "azurerm_key_vault" "salthea_kv" {
+  name                       = "salthea-kv"
+  location                   = azurerm_resource_group.salthea_rg.location
+  resource_group_name        = azurerm_resource_group.salthea_rg.name
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  sku_name                   = "standard"
+  purge_protection_enabled   = true
+  enable_rbac_authorization  = false
+  soft_delete_retention_days = 90
+
+  network_acls {
+    bypass                     = "AzureServices"
+    default_action             = "Deny"
+    virtual_network_subnet_ids = [azurerm_subnet.backend_subnet.id]
+    ip_rules                   = ["YOUR_IP_ADDRESS"] # Replace with your IP for development access
+  }
+
+  # Add this to ensure current user can create secrets
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    key_permissions = [
+      "Get",
+      "List",
+      "Create",
+      "Delete",
+      "Update",
+      "Purge"
+    ]
+
+    secret_permissions = [
+      "Get",
+      "List",
+      "Set",
+      "Delete",
+      "Purge"
+    ]
+
+    certificate_permissions = [
+      "Get",
+      "List",
+      "Create",
+      "Delete",
+      "Update"
+    ]
+  }
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+    hipaa       = "true"
+  }
+}
+
+# ------------------------------
+# Cosmos DB (MongoDB API)
+# ------------------------------
+resource "azurerm_cosmosdb_account" "salthea_cosmos" {
+  name                = "salthea-cosmos"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  offer_type          = "Standard"
+  kind                = "MongoDB"
+
+  capabilities {
+    name = "MongoDBv3.4"
+  }
+
+  capabilities {
+    name = "EnableMongo"
+  }
+
+  consistency_policy {
+    consistency_level       = "Session"
+    max_interval_in_seconds = 5
+    max_staleness_prefix    = 100
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.salthea_rg.location
+    failover_priority = 0
+  }
+
+  # Enable automatic failover
+  enable_automatic_failover = true
+
+  # Use virtual network filtering
+  is_virtual_network_filter_enabled = true
+  virtual_network_rule {
+    id = azurerm_subnet.backend_subnet.id
+  }
+
+  # Set default identity
+  identity {
+    type = "SystemAssigned"
+  }
+
+  # Add this tag for HIPAA compliance tracking
+  tags = {
+    environment = "production"
+    project     = "salthea"
+    hipaa       = "true"
+  }
+}
+
+# Create Cosmos DB Databases
+resource "azurerm_cosmosdb_mongo_database" "salthea_db" {
+  name                = "salthea-database"
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  account_name        = azurerm_cosmosdb_account.salthea_cosmos.name
+  throughput          = 400
+}
+
+# Create Collections for Users and Messages
+resource "azurerm_cosmosdb_mongo_collection" "users_collection" {
+  name                = "users"
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  account_name        = azurerm_cosmosdb_account.salthea_cosmos.name
+  database_name       = azurerm_cosmosdb_mongo_database.salthea_db.name
+
+  # Set index for user ID
+  index {
+    keys   = ["_id"]
+    unique = true
+  }
+
+  # Set index for Clerk user ID
+  index {
+    keys   = ["clerkUserId"]
+    unique = true
+  }
+}
+
+resource "azurerm_cosmosdb_mongo_collection" "messages_collection" {
+  name                = "messages"
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  account_name        = azurerm_cosmosdb_account.salthea_cosmos.name
+  database_name       = azurerm_cosmosdb_mongo_database.salthea_db.name
+
+  # Set index for message ID
+  index {
+    keys   = ["_id"]
+    unique = true
+  }
+
+  # Set index for user ID to query messages by user
+  index {
+    keys = ["userId"]
+  }
+
+  # Set index for timestamp for sorting
+  index {
+    keys = ["timestamp"]
+  }
+}
+
+# Store Cosmos DB Connection String in Key Vault for secure access
+resource "azurerm_key_vault_secret" "cosmos_connection" {
+  name         = "CosmosDbConnectionString"
+  value        = azurerm_cosmosdb_account.salthea_cosmos.connection_strings[0]
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# Azure Blob Storage
+# ------------------------------
+resource "azurerm_storage_account" "salthea_storage" {
+  name                      = "saltheastorage123"
+  resource_group_name       = azurerm_resource_group.salthea_rg.name
+  location                  = azurerm_resource_group.salthea_rg.location
+  account_tier              = "Standard"
+  account_replication_type  = "GRS" # Geo-redundant storage for HIPAA compliance
+  account_kind              = "StorageV2"
+  min_tls_version           = "TLS1_2"
+  enable_https_traffic_only = true
+
+  # Enable blob encryption
+  blob_properties {
+    versioning_enabled       = true
+    change_feed_enabled      = true
+    last_access_time_enabled = true
+    container_delete_retention_policy {
+      days = 7
+    }
+    delete_retention_policy {
+      days = 30
+    }
+  }
+
+  # Add network rules
+  network_rules {
+    default_action             = "Deny"
+    virtual_network_subnet_ids = [azurerm_subnet.backend_subnet.id]
+    bypass                     = ["AzureServices"]
+    ip_rules                   = ["YOUR_IP_ADDRESS"] # Replace with your IP for development access
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+    hipaa       = "true"
+  }
+}
+
+resource "azurerm_storage_container" "salthea_uploads" {
+  name                  = "salthea-uploads"
+  storage_account_name  = azurerm_storage_account.salthea_storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "medical_records" {
+  name                  = "medical-records"
+  storage_account_name  = azurerm_storage_account.salthea_storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "wearable_data" {
+  name                  = "wearable-data"
+  storage_account_name  = azurerm_storage_account.salthea_storage.name
+  container_access_type = "private"
+}
+
+# Store Storage Account Connection String in Key Vault
+resource "azurerm_key_vault_secret" "storage_connection" {
+  name         = "StorageConnectionString"
+  value        = azurerm_storage_account.salthea_storage.primary_connection_string
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# Azure Container Registry
+# ------------------------------
+resource "azurerm_container_registry" "salthea_acr" {
+  name                = "saltheaacr123"
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  location            = azurerm_resource_group.salthea_rg.location
+  sku                 = "Basic"
+  admin_enabled       = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  # Add network rules
+  network_rule_set {
+    default_action = "Deny"
+
+    virtual_network_rule {
+      subnet_id = azurerm_subnet.backend_subnet.id
+      action    = "Allow"
+    }
+
+    ip_rule {
+      action   = "Allow"
+      ip_range = "YOUR_IP_ADDRESS/32" # Replace with your IP for development access
+    }
+  }
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+  }
+}
+
+# Store ACR credentials in Key Vault
+resource "azurerm_key_vault_secret" "acr_username" {
+  name         = "AcrUsername"
+  value        = azurerm_container_registry.salthea_acr.admin_username
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+resource "azurerm_key_vault_secret" "acr_password" {
+  name         = "AcrPassword"
+  value        = azurerm_container_registry.salthea_acr.admin_password
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# App Insights & Log Analytics
+# ------------------------------
+resource "azurerm_log_analytics_workspace" "salthea_logs" {
+  name                = "salthea-logs"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+    hipaa       = "true"
+  }
+}
+
+resource "azurerm_application_insights" "salthea_insights" {
+  name                = "salthea-insights"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  workspace_id        = azurerm_log_analytics_workspace.salthea_logs.id
+  application_type    = "web"
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+    hipaa       = "true"
+  }
+}
+
+# Store App Insights Connection String in Key Vault
+resource "azurerm_key_vault_secret" "appinsights_connection" {
+  name         = "AppInsightsConnectionString"
+  value        = azurerm_application_insights.salthea_insights.connection_string
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# Azure OpenAI
+# ------------------------------
+resource "azurerm_cognitive_account" "salthea_openai" {
+  name                = "salthea-openai"
+  location            = "East US" # Adjust based on availability
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  kind                = "OpenAI"
+  sku_name            = "S0"
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  network_acls {
+    default_action = "Deny"
+    ip_rules       = ["YOUR_IP_ADDRESS"] # Replace with your IP for development access
+    virtual_network_rules {
+      subnet_id = azurerm_subnet.backend_subnet.id
+    }
+  }
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+    hipaa       = "true"
+  }
+}
+
+# Store OpenAI credentials in Key Vault
+resource "azurerm_key_vault_secret" "openai_endpoint" {
+  name         = "AzureOpenAIEndpoint"
+  value        = azurerm_cognitive_account.salthea_openai.endpoint
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+resource "azurerm_key_vault_secret" "openai_key" {
+  name         = "AzureOpenAIKey"
+  value        = azurerm_cognitive_account.salthea_openai.primary_access_key
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# Clerk secrets in Key Vault
+# ------------------------------
+resource "azurerm_key_vault_secret" "clerk_secret" {
+  name         = "ClerkSecretKey"
+  value        = "sk_test_TH8Rg9enkDIEKer4SoUwf8q3P7Zwt21Mthop9nQDZo" # Replace with your actual Clerk secret key
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+resource "azurerm_key_vault_secret" "clerk_pub" {
+  name         = "ClerkPublishableKey"
+  value        = "pk_test_bW92ZWQtamF2ZWxpbi0yNC5jbGVyay5hY2NvdW50cy5kZXYk" # Replace with your actual Clerk publishable key
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# Valyu API Key in Key Vault
+# ------------------------------
+resource "azurerm_key_vault_secret" "valyu_api_key" {
+  name         = "ValyuApiKey"
+  value        = "your-valyu-api-key" # Replace with your actual Valyu API key
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# Azure OpenAI Deployment Name in Key Vault
+# ------------------------------
+resource "azurerm_key_vault_secret" "openai_deployment" {
+  name         = "AzureOpenAIDeploymentName"
+  value        = "salthea-gpt4o" # Model deployment name
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# Sentry DSN in Key Vault
+# ------------------------------
+resource "azurerm_key_vault_secret" "sentry_dsn" {
+  name         = "SentryDSN"
+  value        = "your-sentry-dsn" # Replace with your actual Sentry DSN
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# App Service
+# ------------------------------
+resource "azurerm_linux_web_app" "salthea_api" {
+  name                = "salthea-backend-api"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  service_plan_id     = azurerm_service_plan.salthea_plan.id
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    application_stack {
+      docker_image     = "saltheaacr123.azurecr.io/salthea-backend"
+      docker_image_tag = "latest"
+    }
+
+    container_registry_use_managed_identity = true
+
+    health_check_path = "/health"
+    always_on         = true
+
+    # Add IP restrictions and CORS
+    ip_restriction {
+      action                    = "Allow"
+      name                      = "front-end-access"
+      virtual_network_subnet_id = azurerm_subnet.backend_subnet.id
+      priority                  = 100
+    }
+
+    # Set up CORS
+    cors {
+      allowed_origins     = ["https://salthea.com", "https://www.salthea.com"]
+      support_credentials = true
+    }
+  }
+
+  app_settings = {
+    # Docker settings
+    WEBSITES_PORT              = "3000"
+    DOCKER_REGISTRY_SERVER_URL = "https://saltheaacr123.azurecr.io"
+
+    # Environment and application settings
+    NODE_ENV    = "production"
+    ENVIRONMENT = "production"
+
+    # Security and authentication secrets
+    CLERK_SECRET_KEY      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_secret.id})"
+    CLERK_PUBLISHABLE_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_pub.id})"
+
+    # Database connection
+    COSMOS_DB_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.cosmos_connection.id})"
+
+    # Storage
+    STORAGE_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.storage_connection.id})"
+
+    # OpenAI configuration
+    AZURE_OPENAI_ENDPOINT   = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_endpoint.id})"
+    AZURE_OPENAI_KEY        = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_key.id})"
+    AZURE_OPENAI_DEPLOYMENT = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_deployment.id})"
+
+    # External APIs
+    VALYU_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.valyu_api_key.id})"
+
+    # Monitoring and logging
+    APPLICATIONINSIGHTS_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.appinsights_connection.id})"
+    SENTRY_DSN                            = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.sentry_dsn.id})"
+
+    # Enable Key Vault reference for secrets
+    AZURE_KEY_VAULT_ENDPOINT = azurerm_key_vault.salthea_kv.vault_uri
+
+    # Log level
+    LOG_LEVEL = "info"
+  }
+
+  # Add sticky settings to prevent reset during deployments
+  sticky_settings {
+    app_setting_names = [
+      "WEBSITES_PORT",
+      "DOCKER_REGISTRY_SERVER_URL"
+    ]
+  }
+
+  # Configure logs
+  logs {
+    http_logs {
+      file_system {
+        retention_in_days = 7
+        retention_in_mb   = 35
+      }
+    }
+
+    application_logs {
+      file_system_level = "Information"
+    }
+  }
+
+  tags = {
+    environment = "production"
+    project     = "salthea"
+    hipaa       = "true"
+  }
+}
+
+# ------------------------------
+# App Service Virtual Network Integration
+# ------------------------------
+resource "azurerm_app_service_virtual_network_swift_connection" "app_vnet_integration" {
+  app_service_id = azurerm_linux_web_app.salthea_api.id
+  subnet_id      = azurerm_subnet.backend_subnet.id
+}
+
+# ------------------------------
+# Key Vault Access Policies
+# ------------------------------
+resource "azurerm_key_vault_access_policy" "app_access" {
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.salthea_api.identity[0].principal_id
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
+
+  depends_on = [
+    azurerm_linux_web_app.salthea_api
+  ]
+}
+
+# ------------------------------
+# ACR Role Assignment
+# ------------------------------
+resource "azurerm_role_assignment" "acr_pull" {
+  principal_id         = azurerm_linux_web_app.salthea_api.identity[0].principal_id
+  role_definition_name = "AcrPull"
+  scope                = azurerm_container_registry.salthea_acr.id
+}
+
+# ------------------------------
+# Storage Role Assignment
+# ------------------------------
+resource "azurerm_role_assignment" "storage_blob_contributor" {
+  principal_id         = azurerm_linux_web_app.salthea_api.identity[0].principal_id
+  role_definition_name = "Storage Blob Data Contributor"
+  scope                = azurerm_storage_account.salthea_storage.id
+}
+
+# ------------------------------
+# Private Endpoints for Enhanced Security
+# ------------------------------
+resource "azurerm_private_endpoint" "cosmos_private_endpoint" {
+  name                = "cosmos-private-endpoint"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  subnet_id           = azurerm_subnet.backend_subnet.id
+
+  private_service_connection {
+    name                           = "cosmos-private-connection"
+    private_connection_resource_id = azurerm_cosmosdb_account.salthea_cosmos.id
+    is_manual_connection           = false
+    subresource_names              = ["MongoDB"]
+  }
+}
+
+resource "azurerm_private_endpoint" "storage_private_endpoint" {
+  name                = "storage-private-endpoint"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  subnet_id           = azurerm_subnet.backend_subnet.id
+
+  private_service_connection {
+    name                           = "storage-private-connection"
+    private_connection_resource_id = azurerm_storage_account.salthea_storage.id
+    is_manual_connection           = false
+    subresource_names              = ["blob"]
+  }
+}
+
+resource "azurerm_private_endpoint" "keyvault_private_endpoint" {
+  name                = "keyvault-private-endpoint"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  subnet_id           = azurerm_subnet.backend_subnet.id
+
+  private_service_connection {
+    name                           = "keyvault-private-connection"
+    private_connection_resource_id = azurerm_key_vault.salthea_kv.id
+    is_manual_connection           = false
+    subresource_names              = ["vault"]
+  }
+}
+
+# ------------------------------
+# Staging Slot for Blue-Green Deployments
+# ------------------------------
+resource "azurerm_linux_web_app_slot" "staging_slot" {
+  name           = "staging"
+  app_service_id = azurerm_linux_web_app.salthea_api.id
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    application_stack {
+      docker_image     = "saltheaacr123.azurecr.io/salthea-backend"
+      docker_image_tag = "latest"
+    }
+
+    container_registry_use_managed_identity = true
+
+    health_check_path = "/health"
+    always_on         = true
+  }
+
+  app_settings = azurerm_linux_web_app.salthea_api.app_settings
+
+  tags = {
+    environment = "staging"
+    project     = "salthea"
+  }
+}
+
+# ------------------------------
+# Key Vault Access Policy for Staging Slot
+# ------------------------------
+resource "azurerm_key_vault_access_policy" "staging_app_access" {
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app_slot.staging_slot.identity[0].principal_id
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
+
+  depends_on = [
+    azurerm_linux_web_app_slot.staging_slot
+  ]
+}
+
+# ------------------------------
+# ACR Role Assignment for Staging Slot
+# ------------------------------
+resource "azurerm_role_assignment" "staging_acr_pull" {
+  principal_id         = azurerm_linux_web_app_slot.staging_slot.identity[0].principal_id
+  role_definition_name = "AcrPull"
+  scope                = azurerm_container_registry.salthea_acr.id
+}
+
+# ------------------------------
+# Output values for reference
+# ------------------------------
+output "app_service_url" {
+  value = "https://${azurerm_linux_web_app.salthea_api.default_hostname}"
+}
+
+output "cosmos_endpoint" {
+  value     = azurerm_cosmosdb_account.salthea_cosmos.endpoint
+  sensitive = true
+}
+
+output "app_insights_instrumentation_key" {
+  value     = azurerm_application_insights.salthea_insights.instrumentation_key
+  sensitive = true
+}
+
+output "azure_openai_endpoint" {
+  value     = azurerm_cognitive_account.salthea_openai.endpoint
+  sensitive = true
+}
+
+output "key_vault_uri" {
+  value = azurerm_key_vault.salthea_kv.vault_uri
+}
+
+output "acr_login_server" {
+  value = azurerm_container_registry.salthea_acr.login_server
+}
