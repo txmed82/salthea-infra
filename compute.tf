@@ -249,6 +249,39 @@ resource "azurerm_cognitive_account" "salthea_openai" {
 }
 
 # ------------------------------
+# Azure OpenAI Model Deployment
+# ------------------------------
+resource "azurerm_cognitive_deployment" "gpt4o_deployment" {
+  name                 = var.openai_deployment_name
+  cognitive_account_id = azurerm_cognitive_account.salthea_openai.id
+  
+  model {
+    format  = "OpenAI"
+    name    = "gpt-4o"     # Confirm this exact model name in Azure portal for your region
+    version = "2024-05-13" # Confirm available and desired version
+  }
+  
+  scale {
+    type     = "Standard"  # For Pay-As-You-Go model.
+    capacity = 1           # Base capacity unit (e.g., 1 * 1000 = 1000 Tokens-Per-Minute).
+                           # Actual billing for "Standard" type is based on consumption.
+                           # For "Provisioned" type, this would represent reserved throughput units.
+  }
+
+  # version_upgrade_option was removed as it's not a valid argument in this context/version.
+  # Default behavior or other settings in Azure portal might control version upgrades.
+
+  # Tags are not directly supported on the deployment resource itself.
+  # They are typically inherited from the parent cognitive account.
+
+  depends_on = [
+    azurerm_cognitive_account.salthea_openai
+  ]
+}
+
+
+
+# ------------------------------
 # Role Assignments
 # ------------------------------
 # ACR Role Assignment
@@ -270,4 +303,9 @@ resource "azurerm_role_assignment" "staging_acr_pull" {
   principal_id         = azurerm_linux_web_app_slot.staging_slot.identity[0].principal_id
   role_definition_name = "AcrPull"
   scope                = azurerm_container_registry.salthea_acr.id
-} 
+}
+
+# --------------------------------------
+# Azure Function App for Salthea Backend
+# --------------------------------------
+// ... existing code ... 

@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.90.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 2.45.0"
+    }
   }
   required_version = ">= 1.3.0"
 
@@ -13,6 +17,11 @@ terraform {
 provider "azurerm" {
   features {}
   subscription_id = var.subscription_id
+}
+
+provider "azuread" {
+  # Azure AD provider configuration
+  tenant_id = data.azurerm_client_config.current.tenant_id
 }
 
 data "azurerm_client_config" "current" {}

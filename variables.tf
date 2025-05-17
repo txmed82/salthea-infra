@@ -208,4 +208,51 @@ variable "tags" {
     environment = "production" # Or use var.environment if you prefer
     project     = "salthea"      # Or use var.project_name if you prefer
   }
+}
+
+variable "alert_notification_email" {
+  description = "Email address for alert notifications."
+  type        = string
+  default     = "support@cerebrallabs.io"
+}
+
+# FHIR Service Variables
+variable "fhir_service_name" {
+  description = "Name of the Azure API for FHIR service"
+  type        = string
+  default     = "salthea-fhir"
+}
+
+variable "fhir_service_kind" {
+  description = "Kind of FHIR service (fhir-R4, fhir-Stu3)"
+  type        = string
+  default     = "fhir-R4"
+}
+
+variable "onerecord_client_id" {
+  description = "Client ID for OneRecord OAuth integration"
+  type        = string
+  default     = "onerecord-client-id"
+  sensitive   = true
+}
+
+variable "onerecord_client_secret" {
+  description = "Client secret for OneRecord OAuth integration"
+  type        = string
+  default     = "onerecord-client-secret"
+  sensitive   = true
+}
+
+variable "tryterra_dev_id" {
+  description = "TryTerra developer ID"
+  type        = string
+  default     = "tryterra-dev-id"
+  sensitive   = true
+}
+
+variable "tryterra_api_key" {
+  description = "TryTerra API key"
+  type        = string
+  default     = "tryterra-api-key"
+  sensitive   = true
 } 
