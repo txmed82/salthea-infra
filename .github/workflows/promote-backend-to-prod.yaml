@@ -31,10 +31,8 @@ jobs:
     steps:
       - name: Checkout salthea-infra repository
         uses: actions/checkout@v4
-        with:
-          repository: '{{ github.repository_owner }}/salthea-infra'
-          path: . 
-          token: ${{ secrets.PAT_TOKEN }}
+        # No explicit repository, path, or token needed to checkout the current repository.
+        # The default GITHUB_TOKEN will be used and is scoped correctly.
 
       - name: Azure login using credentials JSON
         uses: azure/login@v1

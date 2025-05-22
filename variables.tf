@@ -5,9 +5,9 @@ variable "subscription_id" {
 }
 
 variable "location" {
-  description = "Azure region for resources"
+  description = "Azure region where resources will be deployed"
   type        = string
-  default     = "Central US"
+  default     = "East US" # Example default, override in tfvars if needed
 }
 
 variable "environment" {
@@ -37,13 +37,13 @@ variable "app_service_name" {
 variable "app_service_plan_name" {
   description = "Name of the App Service Plan"
   type        = string
-  default     = "salthea-app-plan"
+  default     = "salthea-asp"
 }
 
 variable "app_service_plan_sku" {
-  description = "SKU for the App Service Plan"
+  description = "SKU for the App Service Plan (e.g., P1v2, S1, B1)"
   type        = string
-  default     = "S1" # Changed from B1 to S1 to support deployment slots
+  default     = "P1v2" # Example: Premium V2 Small
 }
 
 variable "vnet_name" {
@@ -79,7 +79,13 @@ variable "private_endpoints_subnet_address_prefix" {
 variable "key_vault_name" {
   description = "Name of the Key Vault"
   type        = string
-  default     = "salthea-kv"
+  # default     = "salthea-kv" # Ensure this is globally unique or use a suffix
+}
+
+variable "key_vault_sku" {
+  description = "SKU for the Key Vault (standard or premium)"
+  type        = string
+  default     = "standard"
 }
 
 variable "cosmos_account_name" {
@@ -101,9 +107,15 @@ variable "storage_account_name" {
 }
 
 variable "acr_name" {
-  description = "Azure Container Registry name"
+  description = "Name of the Azure Container Registry"
   type        = string
-  default     = "saltheaacr123"
+  # default     = "saltheaacr" # Ensure this is globally unique
+}
+
+variable "acr_sku" {
+  description = "SKU for the Azure Container Registry (e.g., Basic, Standard, Premium)"
+  type        = string
+  default     = "Standard"
 }
 
 variable "log_analytics_name" {
@@ -113,9 +125,15 @@ variable "log_analytics_name" {
 }
 
 variable "app_insights_name" {
-  description = "Application Insights name"
+  description = "Name of the Application Insights resource"
   type        = string
-  default     = "salthea-insights"
+  default     = "salthea-appinsights"
+}
+
+variable "log_analytics_workspace_name" {
+  description = "Name of the Log Analytics Workspace"
+  type        = string
+  default     = "salthea-loganalytics"
 }
 
 variable "openai_name" {
@@ -172,9 +190,9 @@ variable "sentry_dsn" {
 }
 
 variable "cors_allowed_origins" {
-  description = "List of origins to allow CORS from"
+  description = "A list of allowed origins for CORS configuration."
   type        = list(string)
-  default     = ["https://salthea.com", "https://www.salthea.com", "http://localhost:3000"]
+  default     = ["http://localhost:3000", "https://salthea-frontend.azurewebsites.net", "https://salthea-frontend-staging.azurewebsites.net"]
 }
 
 variable "hipaa_compliant" {
@@ -258,8 +276,72 @@ variable "tryterra_api_key" {
   default     = ""
 }
 
-variable "backend_production_image_tag" {
-  description = "The specific Docker image tag to use for the backend production slot."
+variable "clerk_secret_key_value" {
+  description = "Clerk Secret Key actual value (sensitive)"
   type        = string
-  default     = "specify-in-tfvars-or-pipeline" # Placeholder, ensure this is set to a valid image tag before apply
+  sensitive   = true
+}
+
+variable "clerk_publishable_key_value" {
+  description = "Clerk Publishable Key actual value"
+  type        = string
+  # Not typically sensitive in the same way as the secret key, but good practice to manage through variables
+}
+
+variable "openai_api_key_value" {
+  description = "OpenAI API Key actual value (sensitive)"
+  type        = string
+  sensitive   = true
+}
+
+variable "azure_openai_endpoint_value" {
+  description = "Azure OpenAI Endpoint actual value"
+  type        = string
+}
+
+variable "azure_openai_deployment_value" {
+  description = "Azure OpenAI Deployment ID/Name actual value"
+  type        = string
+}
+
+variable "always_on_enabled" {
+  description = "Flag to enable Always On for the App Service Plan. Recommended for production to avoid cold starts."
+  type        = bool
+  default     = true
+}
+
+variable "frontend_webapp_name" {
+  description = "Name of the frontend web application"
+  type        = string
+  default     = "salthea-frontend"
+}
+
+variable "backend_api_webapp_name" {
+  description = "Name of the backend API web application"
+  type        = string
+  default     = "salthea-backend-api"
+}
+
+variable "storage_account_name_for_logs" {
+  description = "Name of the storage account for App Service logs. Must be globally unique."
+  type        = string
+  # default     = "salthealogs" # Example, ensure uniqueness
+}
+
+variable "storage_account_tier_for_logs" {
+  description = "Storage account tier for logs (e.g., Standard, Premium)."
+  type        = string
+  default     = "Standard"
+}
+
+variable "storage_account_replication_for_logs" {
+  description = "Storage account replication type for logs (e.g., LRS, GRS)."
+  type        = string
+  default     = "LRS"
+}
+
+variable "vnet_integration_subnet_id" {
+  description = "The subnet ID for VNet integration for the App Services."
+  type        = string
+  default     = null # Set to a valid subnet ID if VNet integration is required
 } 

@@ -66,7 +66,7 @@ resource "azurerm_linux_web_app" "salthea_api" {
   site_config {
     application_stack {
       docker_image     = "${var.acr_name}.azurecr.io/salthea-backend"
-      docker_image_tag = var.backend_production_image_tag
+      docker_image_tag = "prod-current"
     }
 
     container_registry_use_managed_identity = true
