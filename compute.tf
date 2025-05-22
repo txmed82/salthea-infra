@@ -66,7 +66,7 @@ resource "azurerm_linux_web_app" "salthea_api" {
   site_config {
     application_stack {
       docker_image     = "${var.acr_name}.azurecr.io/salthea-backend"
-      docker_image_tag = "latest"
+      docker_image_tag = var.backend_production_image_tag
     }
 
     container_registry_use_managed_identity = true
@@ -115,6 +115,18 @@ resource "azurerm_linux_web_app" "salthea_api" {
 
     # External APIs
     VALYU_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.valyu_api_key.id})"
+
+    # FHIR service configuration
+    FHIR_SERVICE_URL = "https://${var.fhir_service_name}.azurehealthcareapis.com"
+    TENANT_ID = data.azurerm_client_config.current.tenant_id
+    SMART_CLIENT_ID = azurerm_key_vault_secret.smart_client_id.value
+    
+    # OneRecord and TryTerra API settings
+    ONERECORD_CLIENT_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_id.id})"
+    ONERECORD_CLIENT_SECRET = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_secret.id})"
+    ONERECORD_REDIRECT_URI = "https://${var.app_service_name}-staging.azurewebsites.net/api/onerecord/callback"
+    TRYTERRA_DEV_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_dev_id.id})"
+    TRYTERRA_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_api_key.id})"
 
     # Monitoring and logging
     APPLICATIONINSIGHTS_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.appinsights_connection.id})"
@@ -183,8 +195,8 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     http2_enabled          = true
     minimum_tls_version    = "1.2"
     use_32_bit_worker      = false
-    always_on              = false # Staging slots often don't need to be always_on to save cost
-                                 # but can be true if needed for your testing/warmup strategy.
+    always_on              = true # Changed from false to true to keep the staging app active
+                                 # This ensures health checks pass and the app doesn't unload
   }
 
   app_settings = {
@@ -199,6 +211,26 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     "SENTRY_DSN"                            = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.sentry_dsn.id})"
     "VALYU_API_KEY"                         = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.valyu_api_key.id})"
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.salthea_insights.connection_string
+    
+    # FHIR service configuration for staging
+    "FHIR_SERVICE_URL" = "https://${var.fhir_service_name}.azurehealthcareapis.com"
+    "TENANT_ID" = data.azurerm_client_config.current.tenant_id
+    "SMART_CLIENT_ID" = azurerm_key_vault_secret.smart_client_id.value
+    
+    # OneRecord and TryTerra API settings
+    "ONERECORD_CLIENT_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_id.id})"
+    "ONERECORD_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_secret.id})"
+    "ONERECORD_REDIRECT_URI" = "https://${var.app_service_name}-staging.azurewebsites.net/api/onerecord/callback"
+    "TRYTERRA_DEV_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_dev_id.id})"
+    "TRYTERRA_API_KEY" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_api_key.id})"
+    
+    # Required for Linux container on App Service
+    "WEBSITES_PORT"              = "3000"
+    "DOCKER_REGISTRY_SERVER_URL" = "https://${var.acr_name}.azurecr.io"
+
+    # Explicit CORS for staging slot
+    "CORS_ALLOWED_ORIGINS"       = "https://salthea-frontend-staging.azurewebsites.net,http://localhost:3000"
+    
     // Add other staging-specific app settings if needed.
     // Note: To make settings "sticky" to the slot (not swap with production),
     // you currently need to configure that in Azure Portal post-creation or use different Key Vault secrets.
@@ -309,3 +341,99 @@ resource "azurerm_role_assignment" "staging_acr_pull" {
 # Azure Function App for Salthea Backend
 # --------------------------------------
 // ... existing code ... 
+
+# ------------------------------
+# Frontend App Service
+# ------------------------------
+resource "azurerm_linux_web_app" "salthea_frontend" {
+  name                = "salthea-frontend"
+  location            = azurerm_resource_group.salthea_rg.location
+  resource_group_name = azurerm_resource_group.salthea_rg.name
+  service_plan_id     = azurerm_service_plan.salthea_plan.id
+  https_only          = true # Enforce HTTPS for the entire app service
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    application_stack {
+      node_version = "18-lts"
+    }
+
+    health_check_path = "/api/health"
+    always_on         = true
+
+    # Set up CORS if needed
+    cors {
+      allowed_origins     = var.cors_allowed_origins
+      support_credentials = true
+    }
+  }
+
+  app_settings = {
+    # Environment and application settings
+    NODE_ENV    = var.environment
+    ENVIRONMENT = var.environment
+
+    # Security and authentication secrets
+    CLERK_SECRET_KEY      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_secret.id})"
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_pub.id})"
+    
+    # Backend API URL
+    NEXT_PUBLIC_API_URL = "https://${var.app_service_name}.azurewebsites.net"
+
+    # Monitoring
+    APPLICATIONINSIGHTS_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.appinsights_connection.id})"
+
+    # Enable Key Vault reference for secrets
+    AZURE_KEY_VAULT_ENDPOINT = azurerm_key_vault.salthea_kv.vault_uri
+  }
+
+  tags = {
+    environment = var.environment
+    project     = var.project_name
+  }
+}
+
+# ------------------------------
+# Frontend Staging Slot for Blue-Green Deployments
+# ------------------------------
+resource "azurerm_linux_web_app_slot" "frontend_staging_slot" {
+  name           = "staging"
+  app_service_id = azurerm_linux_web_app.salthea_frontend.id
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    application_stack {
+      node_version = "18-lts"
+    }
+
+    health_check_path = "/api/health"
+    always_on         = true
+  }
+
+  app_settings = {
+    # Same app settings as the production slot
+    NODE_ENV    = var.environment
+    ENVIRONMENT = "staging"
+    
+    CLERK_SECRET_KEY      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_secret.id})"
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_pub.id})"
+    
+    NEXT_PUBLIC_API_URL = "https://${var.app_service_name}-staging.azurewebsites.net"
+    
+    APPLICATIONINSIGHTS_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.appinsights_connection.id})"
+    AZURE_KEY_VAULT_ENDPOINT = azurerm_key_vault.salthea_kv.vault_uri
+
+    # Azure App Service specific settings for staging slot
+  }
+
+  tags = {
+    environment = "staging"
+    project     = var.project_name
+  }
+} 

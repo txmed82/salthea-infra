@@ -132,17 +132,53 @@ output "fhir_service_url" {
   sensitive   = false
 }
 
-# Add RBAC role assignment for App Service to access FHIR - COMMENTED OUT UNTIL APP SERVICE IS CREATED
-# resource "azurerm_role_assignment" "app_service_fhir_access" {
-#   scope                = azurerm_healthcare_fhir_service.salthea_fhir.id
-#   role_definition_name = "FHIR Data Contributor"
-#   principal_id         = azurerm_app_service.backend_app.identity[0].principal_id
-#   
-#   depends_on = [
-#     azurerm_healthcare_fhir_service.salthea_fhir,
-#     azurerm_app_service.backend_app
-#   ]
-# }
+# Add RBAC role assignment for App Service to access FHIR
+resource "azurerm_role_assignment" "app_service_fhir_contributor" {
+  scope                = azurerm_healthcare_fhir_service.salthea_fhir.id
+  role_definition_name = "FHIR Data Contributor"
+  principal_id         = azurerm_linux_web_app.salthea_api.identity[0].principal_id
+  
+  depends_on = [
+    azurerm_healthcare_fhir_service.salthea_fhir,
+    azurerm_linux_web_app.salthea_api
+  ]
+}
+
+# Add RBAC role assignment for Staging Slot to access FHIR
+resource "azurerm_role_assignment" "staging_fhir_contributor" {
+  scope                = azurerm_healthcare_fhir_service.salthea_fhir.id
+  role_definition_name = "FHIR Data Contributor"
+  principal_id         = azurerm_linux_web_app_slot.staging_slot.identity[0].principal_id
+  
+  depends_on = [
+    azurerm_healthcare_fhir_service.salthea_fhir,
+    azurerm_linux_web_app_slot.staging_slot
+  ]
+}
+
+# Add FHIR Data Reader role to allow read-only access from read-only contexts
+resource "azurerm_role_assignment" "app_service_fhir_reader" {
+  scope                = azurerm_healthcare_fhir_service.salthea_fhir.id
+  role_definition_name = "FHIR Data Reader"
+  principal_id         = azurerm_linux_web_app.salthea_api.identity[0].principal_id
+  
+  depends_on = [
+    azurerm_healthcare_fhir_service.salthea_fhir,
+    azurerm_linux_web_app.salthea_api
+  ]
+}
+
+# Add FHIR Data Exporter role to allow data export operations
+resource "azurerm_role_assignment" "app_service_fhir_exporter" {
+  scope                = azurerm_healthcare_fhir_service.salthea_fhir.id
+  role_definition_name = "FHIR Data Exporter"
+  principal_id         = azurerm_linux_web_app.salthea_api.identity[0].principal_id
+  
+  depends_on = [
+    azurerm_healthcare_fhir_service.salthea_fhir,
+    azurerm_linux_web_app.salthea_api
+  ]
+}
 
 # Create Recovery Services Vault for backup
 resource "azurerm_recovery_services_vault" "salthea_vault" {

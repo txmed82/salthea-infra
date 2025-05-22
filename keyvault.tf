@@ -1,0 +1,1 @@
+# We've removed the duplicate OneRecord and TryTerra secrets since they're already defined in smart_on_fhir.tf 

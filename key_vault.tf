@@ -91,6 +91,38 @@ resource "azurerm_key_vault_access_policy" "staging_app_access" {
   ]
 }
 
+# Frontend App Access Policy
+resource "azurerm_key_vault_access_policy" "frontend_app_access" {
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.salthea_frontend.identity[0].principal_id
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
+
+  depends_on = [
+    azurerm_linux_web_app.salthea_frontend
+  ]
+}
+
+# Frontend Staging Slot Access Policy
+resource "azurerm_key_vault_access_policy" "frontend_staging_app_access" {
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app_slot.frontend_staging_slot.identity[0].principal_id
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
+
+  depends_on = [
+    azurerm_linux_web_app_slot.frontend_staging_slot
+  ]
+}
+
 # ------------------------------
 # Key Vault Secrets
 # ------------------------------

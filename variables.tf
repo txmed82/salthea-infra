@@ -174,13 +174,13 @@ variable "sentry_dsn" {
 variable "cors_allowed_origins" {
   description = "List of origins to allow CORS from"
   type        = list(string)
-  default     = ["https://salthea.com", "https://www.salthea.com"]
+  default     = ["https://salthea.com", "https://www.salthea.com", "http://localhost:3000"]
 }
 
 variable "hipaa_compliant" {
-  description = "Whether the resources should be HIPAA compliant"
+  description = "Flag to indicate if resources should be HIPAA compliant"
   type        = bool
-  default     = true
+  default     = false # Default to false, override in tfvars if needed
 }
 
 variable "log_retention_days" {
@@ -229,30 +229,37 @@ variable "fhir_service_kind" {
   default     = "fhir-R4"
 }
 
+# OneRecord and TryTerra Variables
 variable "onerecord_client_id" {
-  description = "Client ID for OneRecord OAuth integration"
+  description = "Client ID for OneRecord OAuth"
   type        = string
-  default     = "onerecord-client-id"
   sensitive   = true
+  default     = ""
 }
 
 variable "onerecord_client_secret" {
-  description = "Client secret for OneRecord OAuth integration"
+  description = "Client Secret for OneRecord OAuth"
   type        = string
-  default     = "onerecord-client-secret"
   sensitive   = true
+  default     = ""
 }
 
 variable "tryterra_dev_id" {
-  description = "TryTerra developer ID"
+  description = "Developer ID for TryTerra API"
   type        = string
-  default     = "tryterra-dev-id"
   sensitive   = true
+  default     = ""
 }
 
 variable "tryterra_api_key" {
-  description = "TryTerra API key"
+  description = "API Key for TryTerra API"
   type        = string
-  default     = "tryterra-api-key"
   sensitive   = true
+  default     = ""
+}
+
+variable "backend_production_image_tag" {
+  description = "The specific Docker image tag to use for the backend production slot."
+  type        = string
+  default     = "specify-in-tfvars-or-pipeline" # Placeholder, ensure this is set to a valid image tag before apply
 } 
