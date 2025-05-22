@@ -64,7 +64,7 @@ jobs:
       - name: Download Backend Image Tag Artifact
         # Only download if we have a TRIGGERING_RUN_ID and no direct backend_image_tag input was given for dispatch
         if: (env.TRIGGERING_RUN_ID != '' && github.event.inputs.backend_image_tag == '') || (github.event_name == 'workflow_run' && github.event.inputs.backend_image_tag == '')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v3.0.2
         with:
           name: backend-image-tag
           path: ./temp_artifact
