@@ -2,7 +2,7 @@
 # App Service Plan
 # ------------------------------
 resource "azurerm_service_plan" "salthea_plan" {
-  name                = var.app_service_plan_name
+  name                = "salthea-app-plan"
   location            = azurerm_resource_group.salthea_rg.location
   resource_group_name = azurerm_resource_group.salthea_rg.name
   os_type             = "Linux"
@@ -39,13 +39,14 @@ resource "azurerm_container_registry" "salthea_acr" {
 
 # Store ACR credentials in Key Vault
 resource "azurerm_key_vault_secret" "acr_username" {
-  name         = "AcrUsername"
+  name         = "ACRUsernameV2"
   value        = azurerm_container_registry.salthea_acr.admin_username
   key_vault_id = azurerm_key_vault.salthea_kv.id
+  depends_on   = [azurerm_container_registry.salthea_acr]
 }
 
 resource "azurerm_key_vault_secret" "acr_password" {
-  name         = "AcrPassword"
+  name         = "ACRPasswordV2"
   value        = azurerm_container_registry.salthea_acr.admin_password
   key_vault_id = azurerm_key_vault.salthea_kv.id
 }
@@ -201,12 +202,13 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
   app_settings = {
     "APP_ENV"                               = "staging"
     "WEBSITE_NODE_DEFAULT_VERSION"          = "~18" # Ensure this matches your application's Node.js major version
-    "AZURE_COSMOSDB_CONNECTION_STRING"      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.staging_cosmos_connection.id})"
+    "COSMOS_DB_CONNECTION_STRING"           = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.staging_cosmos_connection.id})"
+    "STORAGE_CONNECTION_STRING"             = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.storage_connection.id})"
     "CLERK_SECRET_KEY"                      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_secret.id})"
     "CLERK_PUBLISHABLE_KEY"                 = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_pub.id})"
     "AZURE_OPENAI_ENDPOINT"                 = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_endpoint.id})"
     "AZURE_OPENAI_KEY"                      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_key.id})"
-    "AZURE_OPENAI_DEPLOYMENT_NAME"          = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_deployment.id})"
+    "AZURE_OPENAI_DEPLOYMENT"               = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_deployment.id})"
     "VALYU_API_KEY"                         = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.valyu_api_key.id})"
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.salthea_insights.connection_string
     
@@ -386,6 +388,20 @@ resource "azurerm_linux_web_app" "salthea_frontend" {
 
     # Enable Key Vault reference for secrets
     AZURE_KEY_VAULT_ENDPOINT = azurerm_key_vault.salthea_kv.vault_uri
+
+    # Azure App Service Build Settings - Required for Oryx to build Next.js
+    SCM_DO_BUILD_DURING_DEPLOYMENT = "true"
+    ENABLE_ORYX_BUILD = "true"
+    BUILD_FLAGS = "UseExpressBuild"
+    XDG_CACHE_HOME = "/tmp/.cache"
+    
+    # Force Azure to treat deployment as source code (not pre-built)
+    WEBSITE_RUN_FROM_PACKAGE = "0"
+    SCM_NO_REPOSITORY = "0"
+    
+    # Next.js specific build settings
+    WEBSITE_NODE_DEFAULT_VERSION = "18.20.7"
+    WEBSITE_NPM_DEFAULT_VERSION = "10.8.2"
   }
 
   tags = {
@@ -427,7 +443,19 @@ resource "azurerm_linux_web_app_slot" "frontend_staging_slot" {
     APPLICATIONINSIGHTS_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.appinsights_connection.id})"
     AZURE_KEY_VAULT_ENDPOINT = azurerm_key_vault.salthea_kv.vault_uri
 
-    # Azure App Service specific settings for staging slot
+    # Azure App Service Build Settings - Required for Oryx to build Next.js
+    SCM_DO_BUILD_DURING_DEPLOYMENT = "true"
+    ENABLE_ORYX_BUILD = "true"
+    BUILD_FLAGS = "UseExpressBuild"
+    XDG_CACHE_HOME = "/tmp/.cache"
+    
+    # Force Azure to treat deployment as source code (not pre-built)
+    WEBSITE_RUN_FROM_PACKAGE = "0"
+    SCM_NO_REPOSITORY = "0"
+    
+    # Next.js specific build settings
+    WEBSITE_NODE_DEFAULT_VERSION = "18.20.7"
+    WEBSITE_NPM_DEFAULT_VERSION = "10.8.2"
   }
 
   tags = {
