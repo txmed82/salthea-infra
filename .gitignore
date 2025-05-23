@@ -14,3 +14,6 @@ terraform.tfstate.*
 
 # Terraform plan files
 *.tfplan 
+
+# Terraform variables
+*.tfvars

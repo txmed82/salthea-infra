@@ -129,20 +129,20 @@ resource "azurerm_key_vault_access_policy" "frontend_staging_app_access" {
 # Clerk secrets
 resource "azurerm_key_vault_secret" "clerk_secret" {
   name         = "ClerkSecretKey"
-  value        = var.clerk_secret_key
+  value        = var.clerk_secret_key_value
   key_vault_id = azurerm_key_vault.salthea_kv.id
 }
 
 resource "azurerm_key_vault_secret" "clerk_pub" {
   name         = "ClerkPublishableKey"
-  value        = var.clerk_publishable_key
+  value        = var.clerk_publishable_key_value
   key_vault_id = azurerm_key_vault.salthea_kv.id
 }
 
 # Valyu API Key
 resource "azurerm_key_vault_secret" "valyu_api_key" {
   name         = "ValyuApiKey"
-  value        = var.valyu_api_key
+  value        = var.valyu_api_key_value
   key_vault_id = azurerm_key_vault.salthea_kv.id
 }
 
@@ -150,13 +150,6 @@ resource "azurerm_key_vault_secret" "valyu_api_key" {
 resource "azurerm_key_vault_secret" "openai_deployment" {
   name         = "AzureOpenAIDeploymentName"
   value        = var.openai_deployment_name
-  key_vault_id = azurerm_key_vault.salthea_kv.id
-}
-
-# Sentry DSN
-resource "azurerm_key_vault_secret" "sentry_dsn" {
-  name         = "SentryDSN"
-  value        = var.sentry_dsn
   key_vault_id = azurerm_key_vault.salthea_kv.id
 }
 

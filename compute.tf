@@ -130,7 +130,6 @@ resource "azurerm_linux_web_app" "salthea_api" {
 
     # Monitoring and logging
     APPLICATIONINSIGHTS_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.appinsights_connection.id})"
-    SENTRY_DSN                            = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.sentry_dsn.id})"
 
     # Enable Key Vault reference for secrets
     AZURE_KEY_VAULT_ENDPOINT = azurerm_key_vault.salthea_kv.vault_uri
@@ -208,7 +207,6 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     "AZURE_OPENAI_ENDPOINT"                 = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_endpoint.id})"
     "AZURE_OPENAI_KEY"                      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_key.id})"
     "AZURE_OPENAI_DEPLOYMENT_NAME"          = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_deployment.id})"
-    "SENTRY_DSN"                            = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.sentry_dsn.id})"
     "VALYU_API_KEY"                         = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.valyu_api_key.id})"
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.salthea_insights.connection_string
     
@@ -231,9 +229,9 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     # Explicit CORS for staging slot
     "CORS_ALLOWED_ORIGINS"       = "https://salthea-frontend-staging.azurewebsites.net,http://localhost:3000"
     
-    // Add other staging-specific app settings if needed.
-    // Note: To make settings "sticky" to the slot (not swap with production),
-    // you currently need to configure that in Azure Portal post-creation or use different Key Vault secrets.
+    # Add other staging-specific app settings if needed.
+    # Note: To make settings "sticky" to the slot (not swap with production),
+    # you currently need to configure that in Azure Portal post-creation or use different Key Vault secrets.
   }
 
   identity {

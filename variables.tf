@@ -79,7 +79,7 @@ variable "private_endpoints_subnet_address_prefix" {
 variable "key_vault_name" {
   description = "Name of the Key Vault"
   type        = string
-  # default     = "salthea-kv" # Ensure this is globally unique or use a suffix
+  default     = "salthea-kv" // Ensure this is globally unique or use a suffix
 }
 
 variable "key_vault_sku" {
@@ -109,7 +109,7 @@ variable "storage_account_name" {
 variable "acr_name" {
   description = "Name of the Azure Container Registry"
   type        = string
-  # default     = "saltheaacr" # Ensure this is globally unique
+  default     = "saltheaacr123" // Set to the correct ACR name
 }
 
 variable "acr_sku" {
@@ -154,38 +154,37 @@ variable "ip_allowlist" {
   default     = []  # Changed from ["YOUR_IP_ADDRESS"] to allow all IPs for development
 }
 
+/*
 variable "clerk_secret_key" {
-  description = "Clerk.dev secret key"
+  description = "Clerk.dev secret key - DEPRECATED: use clerk_secret_key_value and supply via tfvars/env"
   type        = string
-  default     = "sk_test_TH8Rg9enkDIEKer4SoUwf8q3P7Zwt21Mthop9nQDZo" # Replace with your actual Clerk secret key
   sensitive   = true
+  # default     = "sk_test_TH8Rg9enkDIEKer4SoUwf8q3P7Zwt21Mthop9nQDZo" # REMOVED - USE TFVARS
 }
+*/
 
+/*
 variable "clerk_publishable_key" {
-  description = "Clerk.dev publishable key"
+  description = "Clerk.dev publishable key - DEPRECATED: use clerk_publishable_key_value and supply via tfvars/env"
   type        = string
-  default     = "pk_test_bW92ZWQtamF2ZWxpbi0yNC5jbGVyay5hY2NvdW50cy5kZXYk" # Replace with your actual Clerk publishable key
   sensitive   = true
+  # default     = "pk_test_bW92ZWQtamF2ZWxpbi0yNC5jbGVyay5hY2NvdW50cy5kZXYk" # REMOVED - USE TFVARS
 }
+*/
 
+/*
 variable "valyu_api_key" {
-  description = "Valyu.network API key"
+  description = "Valyu.network API key - DEPRECATED: use valyu_api_key_value (if created) and supply via tfvars/env"
   type        = string
-  default     = "your-valyu-api-key" # Replace with your actual Valyu API key
   sensitive   = true
+  # default     = "your-valyu-api-key" # REMOVED - USE TFVARS (Create a valyu_api_key_value if needed for KV)
 }
+*/
 
 variable "openai_deployment_name" {
   description = "Azure OpenAI deployment name"
   type        = string
   default     = "salthea-gpt4o"
-  sensitive   = true
-}
-
-variable "sentry_dsn" {
-  description = "Sentry DSN for error tracking"
-  type        = string
-  default     = "your-sentry-dsn" # Replace with your actual Sentry DSN
   sensitive   = true
 }
 
@@ -280,28 +279,43 @@ variable "clerk_secret_key_value" {
   description = "Clerk Secret Key actual value (sensitive)"
   type        = string
   sensitive   = true
+  # No default, value should be provided via tfvars or environment
 }
 
 variable "clerk_publishable_key_value" {
   description = "Clerk Publishable Key actual value"
   type        = string
-  # Not typically sensitive in the same way as the secret key, but good practice to manage through variables
+  sensitive   = true # It's a good idea to mark this sensitive too
+  # No default, value should be provided via tfvars or environment
 }
 
 variable "openai_api_key_value" {
   description = "OpenAI API Key actual value (sensitive)"
   type        = string
   sensitive   = true
+  # No default, value should be provided via tfvars or environment
 }
 
 variable "azure_openai_endpoint_value" {
   description = "Azure OpenAI Endpoint actual value"
   type        = string
+  # No default, value should be provided via tfvars or environment
 }
 
 variable "azure_openai_deployment_value" {
   description = "Azure OpenAI Deployment ID/Name actual value"
   type        = string
+  # No default, value should be provided via tfvars or environment
+}
+
+# We need a valyu_api_key_value if it's to be stored in Key Vault
+# If it's not stored in Key Vault and used directly, the old var.valyu_api_key (now without default) will be prompted for.
+# For consistency with Key Vault pattern:
+variable "valyu_api_key_value" {
+  description = "Valyu API Key actual value (sensitive) - for Key Vault storage"
+  type        = string
+  sensitive   = true
+  # No default, value should be provided via tfvars or environment
 }
 
 variable "always_on_enabled" {
@@ -325,7 +339,7 @@ variable "backend_api_webapp_name" {
 variable "storage_account_name_for_logs" {
   description = "Name of the storage account for App Service logs. Must be globally unique."
   type        = string
-  # default     = "salthealogs" # Example, ensure uniqueness
+  default     = "salthealogs" // Ensure uniqueness
 }
 
 variable "storage_account_tier_for_logs" {
