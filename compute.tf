@@ -52,208 +52,9 @@ resource "azurerm_key_vault_secret" "acr_password" {
 }
 
 # ------------------------------
-# App Service
+# NOTE: Backend App Service resources moved to compute-improved.tf
+# This file now only contains unique resources not in compute-improved.tf
 # ------------------------------
-resource "azurerm_linux_web_app" "salthea_api" {
-  name                = var.app_service_name
-  location            = azurerm_resource_group.salthea_rg.location
-  resource_group_name = azurerm_resource_group.salthea_rg.name
-  service_plan_id     = azurerm_service_plan.salthea_plan.id
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  site_config {
-    application_stack {
-      docker_image     = "${var.acr_name}.azurecr.io/salthea-backend"
-      docker_image_tag = "prod-current"
-    }
-
-    container_registry_use_managed_identity = true
-
-    health_check_path = "/health"
-    always_on         = true
-
-    # Add IP restrictions and CORS
-    # ip_restriction {  // Temporarily commented out to resolve plan issue
-    #   action                    = "Allow"
-    #   name                      = "front-end-access"
-    #   virtual_network_subnet_id = azurerm_subnet.backend_subnet.id
-    #   priority                  = 100
-    # }
-
-    # Set up CORS
-    cors {
-      allowed_origins     = var.cors_allowed_origins
-      support_credentials = true
-    }
-  }
-
-  app_settings = {
-    # Docker settings
-    WEBSITES_PORT              = "3000"
-    DOCKER_REGISTRY_SERVER_URL = "https://${var.acr_name}.azurecr.io"
-
-    # Environment and application settings
-    NODE_ENV    = var.environment
-    ENVIRONMENT = var.environment
-
-    # Security and authentication secrets
-    CLERK_SECRET_KEY      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_secret.id})"
-    CLERK_PUBLISHABLE_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_pub.id})"
-
-    # Database connection
-    COSMOS_DB_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.cosmos_connection.id})"
-
-    # Storage
-    STORAGE_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.storage_connection.id})"
-
-    # OpenAI configuration
-    AZURE_OPENAI_ENDPOINT   = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_endpoint.id})"
-    AZURE_OPENAI_KEY        = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_key.id})"
-    AZURE_OPENAI_DEPLOYMENT = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_deployment.id})"
-
-    # External APIs
-    VALYU_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.valyu_api_key.id})"
-
-    # FHIR service configuration
-    FHIR_SERVICE_URL = "https://${var.fhir_service_name}.azurehealthcareapis.com"
-    TENANT_ID = data.azurerm_client_config.current.tenant_id
-    SMART_CLIENT_ID = azurerm_key_vault_secret.smart_client_id.value
-    
-    # OneRecord and TryTerra API settings
-    ONERECORD_CLIENT_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_id.id})"
-    ONERECORD_CLIENT_SECRET = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_secret.id})"
-    ONERECORD_REDIRECT_URI = "https://${var.app_service_name}-staging.azurewebsites.net/api/onerecord/callback"
-    TRYTERRA_DEV_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_dev_id.id})"
-    TRYTERRA_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_api_key.id})"
-
-    # Monitoring and logging
-    APPLICATIONINSIGHTS_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.appinsights_connection.id})"
-
-    # Enable Key Vault reference for secrets
-    AZURE_KEY_VAULT_ENDPOINT = azurerm_key_vault.salthea_kv.vault_uri
-
-    # Log level
-    LOG_LEVEL = "info"
-  }
-
-  # Add sticky settings to prevent reset during deployments
-  sticky_settings {
-    app_setting_names = [
-      "WEBSITES_PORT",
-      "DOCKER_REGISTRY_SERVER_URL"
-    ]
-  }
-
-  # Configure logs
-  logs {
-    http_logs {
-      file_system {
-        retention_in_days = 7
-        retention_in_mb   = 35
-      }
-    }
-
-    application_logs {
-      file_system_level = "Information"
-    }
-  }
-
-  tags = {
-    environment = var.environment
-    project     = var.project_name
-    hipaa       = var.hipaa_compliant ? "true" : "false"
-  }
-}
-
-# ------------------------------
-# Staging Slot for Blue-Green Deployments
-# ------------------------------
-resource "azurerm_linux_web_app_slot" "staging_slot" {
-  name           = "staging"
-  app_service_id = azurerm_linux_web_app.salthea_api.id
-
-  site_config {
-    # Inherits application_stack from production by default if not specified,
-    # but we can be explicit if we want to ensure it uses managed identity for ACR.
-    # If you want staging to pull a *different* default image/tag than production before CI/CD updates it,
-    # you would specify application_stack here.
-    # For now, let's ensure managed identity is clearly intended for ACR pulls.
-    container_registry_use_managed_identity = true
-
-    application_stack {
-      # This defines the *initial* image. CI/CD will update this.
-      # It's good practice to point it to a known stable tag or the same as prod initially.
-      docker_image     = "${var.acr_name}.azurecr.io/salthea-backend"
-      docker_image_tag = "latest" # Or a specific stable tag
-    }
-
-    vnet_route_all_enabled = true # If your production app uses VNet integration
-    ftps_state             = "FtpsOnly"
-    http2_enabled          = true
-    minimum_tls_version    = "1.2"
-    use_32_bit_worker      = false
-    always_on              = true # Changed from false to true to keep the staging app active
-                                 # This ensures health checks pass and the app doesn't unload
-  }
-
-  app_settings = {
-    "APP_ENV"                               = "staging"
-    "WEBSITE_NODE_DEFAULT_VERSION"          = "~18" # Ensure this matches your application's Node.js major version
-    "COSMOS_DB_CONNECTION_STRING"           = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.staging_cosmos_connection.id})"
-    "STORAGE_CONNECTION_STRING"             = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.storage_connection.id})"
-    "CLERK_SECRET_KEY"                      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_secret.id})"
-    "CLERK_PUBLISHABLE_KEY"                 = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_pub.id})"
-    "AZURE_OPENAI_ENDPOINT"                 = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_endpoint.id})"
-    "AZURE_OPENAI_KEY"                      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_key.id})"
-    "AZURE_OPENAI_DEPLOYMENT"               = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.openai_deployment.id})"
-    "VALYU_API_KEY"                         = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.valyu_api_key.id})"
-    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.salthea_insights.connection_string
-    
-    # FHIR service configuration for staging
-    "FHIR_SERVICE_URL" = "https://${var.fhir_service_name}.azurehealthcareapis.com"
-    "TENANT_ID" = data.azurerm_client_config.current.tenant_id
-    "SMART_CLIENT_ID" = azurerm_key_vault_secret.smart_client_id.value
-    
-    # OneRecord and TryTerra API settings
-    "ONERECORD_CLIENT_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_id.id})"
-    "ONERECORD_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_secret.id})"
-    "ONERECORD_REDIRECT_URI" = "https://${var.app_service_name}-staging.azurewebsites.net/api/onerecord/callback"
-    "TRYTERRA_DEV_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_dev_id.id})"
-    "TRYTERRA_API_KEY" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_api_key.id})"
-    
-    # Required for Linux container on App Service
-    "WEBSITES_PORT"              = "3000"
-    "DOCKER_REGISTRY_SERVER_URL" = "https://${var.acr_name}.azurecr.io"
-
-    # Explicit CORS for staging slot
-    "CORS_ALLOWED_ORIGINS"       = "https://salthea-frontend-staging.azurewebsites.net,http://localhost:3000"
-    
-    # Add other staging-specific app settings if needed.
-    # Note: To make settings "sticky" to the slot (not swap with production),
-    # you currently need to configure that in Azure Portal post-creation or use different Key Vault secrets.
-  }
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  virtual_network_subnet_id = azurerm_subnet.backend_subnet.id # Match production app service VNet integration
-
-  tags = {
-    environment = "staging"
-    project     = var.project_name
-    hipaa       = var.hipaa_compliant ? "true" : "false"
-  }
-
-  depends_on = [
-    azurerm_linux_web_app.salthea_api,
-    azurerm_key_vault_secret.staging_cosmos_connection,
-    azurerm_subnet.backend_subnet
-  ]
-}
 
 # ------------------------------
 # Azure OpenAI
@@ -295,7 +96,7 @@ resource "azurerm_cognitive_deployment" "gpt4o_deployment" {
   
   scale {
     type     = "Standard"  # For Pay-As-You-Go model.
-    capacity = 1           # Base capacity unit (e.g., 1 * 1000 = 1000 Tokens-Per-Minute).
+    capacity = 50          # Base capacity unit (e.g., 50 * 1000 = 50000 Tokens-Per-Minute).
                            # Actual billing for "Standard" type is based on consumption.
                            # For "Provisioned" type, this would represent reserved throughput units.
   }
@@ -311,36 +112,29 @@ resource "azurerm_cognitive_deployment" "gpt4o_deployment" {
   ]
 }
 
-
-
 # ------------------------------
 # Role Assignments
 # ------------------------------
-# ACR Role Assignment
+# ACR Role Assignment - reference to backend app in compute-improved.tf
 resource "azurerm_role_assignment" "acr_pull" {
   principal_id         = azurerm_linux_web_app.salthea_api.identity[0].principal_id
   role_definition_name = "AcrPull"
   scope                = azurerm_container_registry.salthea_acr.id
 }
 
-# Storage Role Assignment
+# Storage Role Assignment - reference to backend app in compute-improved.tf
 resource "azurerm_role_assignment" "storage_blob_contributor" {
   principal_id         = azurerm_linux_web_app.salthea_api.identity[0].principal_id
   role_definition_name = "Storage Blob Data Contributor"
   scope                = azurerm_storage_account.salthea_storage.id
 }
 
-# ACR Role Assignment for Staging Slot
+# ACR Role Assignment for Staging Slot - reference to staging slot in compute-improved.tf
 resource "azurerm_role_assignment" "staging_acr_pull" {
   principal_id         = azurerm_linux_web_app_slot.staging_slot.identity[0].principal_id
   role_definition_name = "AcrPull"
   scope                = azurerm_container_registry.salthea_acr.id
 }
-
-# --------------------------------------
-# Azure Function App for Salthea Backend
-# --------------------------------------
-// ... existing code ... 
 
 # ------------------------------
 # Frontend App Service
