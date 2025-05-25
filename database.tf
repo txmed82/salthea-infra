@@ -30,25 +30,16 @@ resource "azurerm_cosmosdb_account" "salthea_cosmos" {
   # Enable automatic failover
   enable_automatic_failover = true
 
-  # Use virtual network filtering
-  is_virtual_network_filter_enabled = true
-  virtual_network_rule {
-    id = azurerm_subnet.backend_subnet.id
-  }
-
   # Set default identity
   identity {
     type = "SystemAssigned"
   }
 
-  # Enable private network access only
+  # Enable public network access for connectivity
   public_network_access_enabled = true
 
-  # Disable IP rules as access is now via private endpoint
-  ip_range_filter = "130.45.49.7"
-
-  # For development, you might allow all IPs if needed, but be cautious:
-  # ip_range_filter = "0.0.0.0/0"
+  # Allow all IPs for now (restore original working state)
+  # ip_range_filter = "130.45.49.7"
 
   # Consider if network_acl_bypass_for_azure_services is needed if other Azure services need to connect
   # network_acl_bypass_for_azure_services = true

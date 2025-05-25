@@ -83,14 +83,19 @@ resource "azurerm_private_dns_zone" "fhir_dns_zone" {
   }
 }
 
-# Link the DNS Zone to the VNet
-resource "azurerm_private_dns_zone_virtual_network_link" "fhir_dns_link" {
-  name                  = "fhir-dns-link"
-  resource_group_name   = azurerm_resource_group.salthea_rg.name
-  private_dns_zone_name = azurerm_private_dns_zone.fhir_dns_zone.name
-  virtual_network_id    = azurerm_virtual_network.salthea_vnet.id
-  registration_enabled  = false
-}
+# Private DNS link to VNet - DISABLED due to VNet removal
+# resource "azurerm_private_dns_zone_virtual_network_link" "fhir_dns_link" {
+#   name                  = "fhir-dns-link"
+#   resource_group_name   = azurerm_resource_group.salthea_rg.name
+#   private_dns_zone_name = azurerm_private_dns_zone.fhir_dns_zone.name
+#   virtual_network_id    = azurerm_virtual_network.salthea_vnet.id
+#   registration_enabled  = false
+#   
+#   tags = {
+#     environment = var.environment
+#     project     = var.project_name
+#   }
+# }
 
 # Create a DNS record for the private endpoint - COMMENTED OUT UNTIL PRIVATE ENDPOINT IS CREATED
 # resource "azurerm_private_dns_a_record" "fhir_dns_record" {
@@ -107,9 +112,8 @@ resource "azurerm_monitor_diagnostic_setting" "fhir_diag" {
   target_resource_id         = azurerm_healthcare_fhir_service.salthea_fhir.id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.salthea_logs.id
 
-  log {
+  enabled_log {
     category = "AuditLogs"
-    enabled  = true
   }
 
   metric {
@@ -120,9 +124,12 @@ resource "azurerm_monitor_diagnostic_setting" "fhir_diag" {
 
 # Store FHIR Service credentials in Key Vault
 resource "azurerm_key_vault_secret" "fhir_service_url" {
-  name         = "FhirServiceUrl"
+  name         = "FHIRServiceURLV2"
   value        = "https://${var.fhir_service_name}.azurehealthcareapis.com"
   key_vault_id = azurerm_key_vault.salthea_kv.id
+  depends_on = [
+    azurerm_healthcare_fhir_service.salthea_fhir
+  ]
 }
 
 # Output FHIR Service URL

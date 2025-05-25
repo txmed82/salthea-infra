@@ -20,7 +20,7 @@ resource "azurerm_key_vault" "salthea_kv" {
     virtual_network_subnet_ids = []
   }
 
-  # Add this to ensure current user can create secrets
+  # Only include the current user access policy here
   access_policy {
     tenant_id = data.azurerm_client_config.current.tenant_id
     object_id = data.azurerm_client_config.current.object_id
@@ -59,7 +59,7 @@ resource "azurerm_key_vault" "salthea_kv" {
 }
 
 # ------------------------------
-# Key Vault Access Policies
+# Key Vault Access Policies (as separate resources to avoid cycles)
 # ------------------------------
 resource "azurerm_key_vault_access_policy" "app_access" {
   key_vault_id = azurerm_key_vault.salthea_kv.id
@@ -91,7 +91,6 @@ resource "azurerm_key_vault_access_policy" "staging_app_access" {
   ]
 }
 
-# Frontend App Access Policy
 resource "azurerm_key_vault_access_policy" "frontend_app_access" {
   key_vault_id = azurerm_key_vault.salthea_kv.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
@@ -107,7 +106,6 @@ resource "azurerm_key_vault_access_policy" "frontend_app_access" {
   ]
 }
 
-# Frontend Staging Slot Access Policy
 resource "azurerm_key_vault_access_policy" "frontend_staging_app_access" {
   key_vault_id = azurerm_key_vault.salthea_kv.id
   tenant_id    = data.azurerm_client_config.current.tenant_id

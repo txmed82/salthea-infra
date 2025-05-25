@@ -1,0 +1,89 @@
+{
+    "version": 4,
+    "terraform_version": "1.5.7",
+    "serial": 1,
+    "lineage": "",
+    "outputs": {},
+    "resources": [
+        {
+            "mode": "managed",
+            "type": "azurerm_storage_account",
+            "name": "tfstate_storage",
+            "provider": "provider[\"registry.terraform.io/hashicorp/azurerm\"]",
+            "instances": [
+                {
+                    "schema_version": 3,
+                    "attributes": {
+                        "access_tier": "Hot",
+                        "account_kind": "StorageV2",
+                        "account_replication_type": "LRS",
+                        "account_tier": "Standard",
+                        "allow_blob_public_access": true,
+                        "allow_nested_items_to_be_public": true,
+                        "allow_shared_key_access": true,
+                        "allowed_copy_scope": null,
+                        "cross_tenant_replication_enabled": true,
+                        "custom_domain": [],
+                        "default_to_oauth_authentication": false,
+                        "enable_https_traffic_only": true,
+                        "id": "/subscriptions/598dfb98-1228-47ff-8459-ec0d6192bb05/resourceGroups/salthea-tfstate-rg/providers/Microsoft.Storage/storageAccounts/saltheatfstate",
+                        "infrastructure_encryption_enabled": false,
+                        "is_hns_enabled": false,
+                        "location": "eastus",
+                        "min_tls_version": "TLS1_2",
+                        "name": "saltheatfstate",
+                        "network_rules": [
+                            {
+                                "bypass": ["AzureServices"],
+                                "default_action": "Allow",
+                                "ip_rules": [],
+                                "private_link_access": [],
+                                "virtual_network_subnet_ids": []
+                            }
+                        ],
+                        "primary_access_key": null,
+                        "primary_blob_connection_string": null,
+                        "primary_blob_endpoint": "https://saltheatfstate.blob.core.windows.net/",
+                        "primary_connection_string": null,
+                        "primary_dfs_endpoint": "https://saltheatfstate.dfs.core.windows.net/",
+                        "primary_file_endpoint": "https://saltheatfstate.file.core.windows.net/",
+                        "primary_location": "eastus",
+                        "primary_queue_endpoint": "https://saltheatfstate.queue.core.windows.net/",
+                        "primary_table_endpoint": "https://saltheatfstate.table.core.windows.net/",
+                        "primary_web_endpoint": "https://saltheatfstate.z13.web.core.windows.net/",
+                        "public_network_access_enabled": true,
+                        "queue_encryption_key_type": "Service",
+                        "resource_group_name": "salthea-tfstate-rg",
+                        "secondary_access_key": null,
+                        "secondary_blob_connection_string": null,
+                        "secondary_blob_endpoint": null,
+                        "secondary_connection_string": null,
+                        "secondary_dfs_endpoint": null,
+                        "secondary_file_endpoint": null,
+                        "secondary_location": null,
+                        "secondary_queue_endpoint": null,
+                        "secondary_table_endpoint": null,
+                        "secondary_web_endpoint": null,
+                        "shared_access_key_enabled": true,
+                        "tags": {
+                            "environment": "production",
+                            "project": "salthea"
+                        },
+                        "timeouts": null,
+                        "blob_properties": [
+                            {
+                                "change_feed_enabled": false,
+                                "cors_rule": [],
+                                "delete_retention_policy": [],
+                                "last_access_time_enabled": false,
+                                "pitr_enabled": false,
+                                "versioning_enabled": true
+                            }
+                        ],
+                        "identity": []
+                    }
+                }
+            ]
+        }
+    ]
+} 

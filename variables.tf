@@ -215,7 +215,7 @@ variable "cosmos_throughput" {
 variable "staging_cosmos_db_connection_string_secret_name" {
   description = "The name of the Key Vault secret for the staging Cosmos DB connection string."
   type        = string
-  default     = "StagingCosmosDbConnectionString"
+  default     = "StagingCosmosDbConnectionStringV2"
 }
 
 variable "tags" {
@@ -246,16 +246,16 @@ variable "fhir_service_kind" {
   default     = "fhir-R4"
 }
 
-# OneRecord and TryTerra Variables
-variable "onerecord_client_id" {
-  description = "Client ID for OneRecord OAuth"
+# TryTerra and Particle Health Variables
+variable "particle_health_client_id" {
+  description = "Client ID for Particle Health OAuth2"
   type        = string
   sensitive   = true
   default     = ""
 }
 
-variable "onerecord_client_secret" {
-  description = "Client Secret for OneRecord OAuth"
+variable "particle_health_client_secret" {
+  description = "Client Secret for Particle Health OAuth2"
   type        = string
   sensitive   = true
   default     = ""

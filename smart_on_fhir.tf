@@ -79,7 +79,7 @@ resource "azurerm_key_vault_secret" "smart_client_id" {
 }
 
 resource "azurerm_key_vault_secret" "smart_client_secret" {
-  name         = "SmartOnFhirClientSecret"
+  name         = "SmartOnFhirClientSecretV2"
   value        = azuread_application_password.smart_on_fhir_secret.value
   key_vault_id = azurerm_key_vault.salthea_kv.id
   
@@ -89,16 +89,16 @@ resource "azurerm_key_vault_secret" "smart_client_secret" {
   ]
 }
 
-# Store OneRecord credentials in Key Vault
-resource "azurerm_key_vault_secret" "onerecord_client_id" {
-  name         = "OneRecordClientId"
-  value        = var.onerecord_client_id
+# Store Particle Health credentials in Key Vault
+resource "azurerm_key_vault_secret" "particle_health_client_id" {
+  name         = "ParticleHealthClientId"
+  value        = var.particle_health_client_id
   key_vault_id = azurerm_key_vault.salthea_kv.id
 }
 
-resource "azurerm_key_vault_secret" "onerecord_client_secret" {
-  name         = "OneRecordClientSecret"
-  value        = var.onerecord_client_secret
+resource "azurerm_key_vault_secret" "particle_health_client_secret" {
+  name         = "ParticleHealthClientSecret"
+  value        = var.particle_health_client_secret
   key_vault_id = azurerm_key_vault.salthea_kv.id
 }
 

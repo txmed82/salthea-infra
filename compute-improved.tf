@@ -19,7 +19,7 @@ resource "azurerm_linux_web_app" "salthea_api" {
     }
 
     container_registry_use_managed_identity = true
-    health_check_path = "/health"
+    # health_check_path = "/health"  # Temporarily disabled to prevent restarts
     always_on         = true
 
     # Improved CORS configuration
@@ -63,12 +63,11 @@ resource "azurerm_linux_web_app" "salthea_api" {
     # FHIR service configuration
     FHIR_SERVICE_URL = "https://${var.fhir_service_name}.azurehealthcareapis.com"
     TENANT_ID = data.azurerm_client_config.current.tenant_id
-    SMART_CLIENT_ID = azurerm_key_vault_secret.smart_client_id.value
+    SMART_CLIENT_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.smart_client_id.id})"
     
-    # OneRecord and TryTerra API settings
-    ONERECORD_CLIENT_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_id.id})"
-    ONERECORD_CLIENT_SECRET = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_secret.id})"
-    ONERECORD_REDIRECT_URI = "https://${var.app_service_name}.azurewebsites.net/api/onerecord/callback"  # Production URL
+    # TryTerra and Particle Health API settings
+    PARTICLE_HEALTH_CLIENT_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_id.id})"
+    PARTICLE_HEALTH_CLIENT_SECRET = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_secret.id})"
     TRYTERRA_DEV_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_dev_id.id})"
     TRYTERRA_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_api_key.id})"
 
@@ -85,8 +84,7 @@ resource "azurerm_linux_web_app" "salthea_api" {
     app_setting_names = [
       "WEBSITES_PORT",
       "DOCKER_REGISTRY_SERVER_URL",
-      "DEPLOYMENT_TAG",
-      "ONERECORD_REDIRECT_URI"  # Keep production-specific URLs sticky
+      "DEPLOYMENT_TAG"
     ]
   }
 
@@ -160,12 +158,11 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     # FHIR service configuration for staging
     "FHIR_SERVICE_URL" = "https://${var.fhir_service_name}.azurehealthcareapis.com"
     "TENANT_ID" = data.azurerm_client_config.current.tenant_id
-    "SMART_CLIENT_ID" = azurerm_key_vault_secret.smart_client_id.value
+    "SMART_CLIENT_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.smart_client_id.id})"
     
-    # Staging-specific redirect URLs
-    "ONERECORD_CLIENT_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_id.id})"
-    "ONERECORD_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.onerecord_client_secret.id})"
-    "ONERECORD_REDIRECT_URI" = "https://${var.app_service_name}-staging.azurewebsites.net/api/onerecord/callback"
+    # TryTerra and Particle Health API settings for staging
+    "PARTICLE_HEALTH_CLIENT_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_id.id})"
+    "PARTICLE_HEALTH_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_secret.id})"
     "TRYTERRA_DEV_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_dev_id.id})"
     "TRYTERRA_API_KEY" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_api_key.id})"
     
@@ -180,8 +177,6 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     type = "SystemAssigned"
   }
 
-  virtual_network_subnet_id = azurerm_subnet.backend_subnet.id
-
   tags = {
     environment = "staging"
     project     = var.project_name
@@ -190,8 +185,7 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
 
   depends_on = [
     azurerm_linux_web_app.salthea_api,
-    azurerm_key_vault_secret.staging_cosmos_connection,
-    azurerm_subnet.backend_subnet
+    azurerm_key_vault_secret.staging_cosmos_connection
   ]
 }
 
