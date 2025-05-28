@@ -19,7 +19,7 @@ resource "azurerm_linux_web_app" "salthea_api" {
     }
 
     container_registry_use_managed_identity = true
-    # health_check_path = "/health"  # Temporarily disabled to prevent restarts
+    health_check_path = "/health"
     always_on         = true
 
     # Improved CORS configuration
@@ -63,7 +63,7 @@ resource "azurerm_linux_web_app" "salthea_api" {
     # FHIR service configuration
     FHIR_SERVICE_URL = "https://${var.fhir_service_name}.azurehealthcareapis.com"
     TENANT_ID = data.azurerm_client_config.current.tenant_id
-    SMART_CLIENT_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.smart_client_id.id})"
+    SMART_CLIENT_ID = azurerm_key_vault_secret.smart_client_id.value
     
     # TryTerra and Particle Health API settings
     PARTICLE_HEALTH_CLIENT_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_id.id})"
@@ -158,7 +158,7 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     # FHIR service configuration for staging
     "FHIR_SERVICE_URL" = "https://${var.fhir_service_name}.azurehealthcareapis.com"
     "TENANT_ID" = data.azurerm_client_config.current.tenant_id
-    "SMART_CLIENT_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.smart_client_id.id})"
+    "SMART_CLIENT_ID" = azurerm_key_vault_secret.smart_client_id.value
     
     # TryTerra and Particle Health API settings for staging
     "PARTICLE_HEALTH_CLIENT_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_id.id})"
@@ -177,6 +177,8 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     type = "SystemAssigned"
   }
 
+  virtual_network_subnet_id = azurerm_subnet.backend_subnet.id
+
   tags = {
     environment = "staging"
     project     = var.project_name
@@ -185,7 +187,8 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
 
   depends_on = [
     azurerm_linux_web_app.salthea_api,
-    azurerm_key_vault_secret.staging_cosmos_connection
+    azurerm_key_vault_secret.staging_cosmos_connection,
+    azurerm_subnet.backend_subnet
   ]
 }
 
