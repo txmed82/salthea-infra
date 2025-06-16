@@ -102,6 +102,13 @@ resource "azurerm_key_vault_secret" "particle_health_client_secret" {
   key_vault_id = azurerm_key_vault.salthea_kv.id
 }
 
+# Store Particle Health base URL
+resource "azurerm_key_vault_secret" "particle_health_base_url" {
+  name         = "ParticleHealthBaseUrl"
+  value        = var.particle_health_base_url
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
 # Store TryTerra credentials in Key Vault
 resource "azurerm_key_vault_secret" "tryterra_dev_id" {
   name         = "TryTerraDevId"

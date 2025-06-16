@@ -261,6 +261,12 @@ variable "particle_health_client_secret" {
   default     = ""
 }
 
+variable "particle_health_base_url" {
+  description = "Base URL for Particle Health API (e.g., https://sandbox.particlehealth.com or https://api.particlehealth.com)"
+  type        = string
+  default     = "https://sandbox.particlehealth.com"
+}
+
 variable "tryterra_dev_id" {
   description = "Developer ID for TryTerra API"
   type        = string
@@ -358,4 +364,10 @@ variable "vnet_integration_subnet_id" {
   description = "The subnet ID for VNet integration for the App Services."
   type        = string
   default     = null # Set to a valid subnet ID if VNet integration is required
+}
+
+variable "particle_webhook_secret_value" {
+  description = "HMAC secret Particle Health will use to sign webhook calls"
+  type        = string
+  sensitive   = true
 } 

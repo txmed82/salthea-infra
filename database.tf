@@ -30,25 +30,37 @@ resource "azurerm_cosmosdb_account" "salthea_cosmos" {
   # Enable automatic failover
   enable_automatic_failover = true
 
+  # Enforce VNet + Private Endpoint only
+  is_virtual_network_filter_enabled   = true
+
+  # Disable public network access (newer API) – ignored on older Mongo accounts
+  public_network_access_enabled = false
+
+  # No IP allow-list  (empty string)
+  ip_range_filter = ""
+
+  # Consider if network_acl_bypass_for_azure_services is needed if other Azure services need to connect
+  # network_acl_bypass_for_azure_services = true
+
   # Set default identity
   identity {
     type = "SystemAssigned"
   }
-
-  # Enable public network access for connectivity
-  public_network_access_enabled = true
-
-  # Allow all IPs for now (restore original working state)
-  # ip_range_filter = "130.45.49.7"
-
-  # Consider if network_acl_bypass_for_azure_services is needed if other Azure services need to connect
-  # network_acl_bypass_for_azure_services = true
 
   # Add this tag for HIPAA compliance tracking
   tags = {
     environment = var.environment
     project     = var.project_name
     hipaa       = var.hipaa_compliant ? "true" : "false"
+  }
+
+  lifecycle {
+    # Azure sometimes injects system IPs; prevent drift cycles
+    ignore_changes = [
+      is_virtual_network_filter_enabled,
+      ip_range_filter,
+      public_network_access_enabled
+    ]
   }
 }
 

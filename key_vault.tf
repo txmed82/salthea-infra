@@ -169,4 +169,39 @@ resource "azurerm_key_vault_secret" "staging_cosmos_connection" {
   name         = var.staging_cosmos_db_connection_string_secret_name
   value        = "YOUR_STAGING_COSMOS_DB_CONNECTION_STRING_OR_USE_PROD" # Placeholder: Update this value!
   key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+# ------------------------------
+# New secrets for FHIR push + Particle webhook
+# ------------------------------
+
+resource "azurerm_key_vault_secret" "azure_fhir_url" {
+  name         = "azure-fhir-url"
+  value        = "https://${var.fhir_service_name}.azurehealthcareapis.com"
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+  depends_on   = [azurerm_healthcare_fhir_service.salthea_fhir]
+}
+
+resource "azurerm_key_vault_secret" "azure_tenant_id" {
+  name         = "azure-tenant-id"
+  value        = data.azurerm_client_config.current.tenant_id
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+resource "azurerm_key_vault_secret" "azure_client_id" {
+  name         = "azure-client-id"
+  value        = azuread_application.fhir_client.application_id
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+resource "azurerm_key_vault_secret" "azure_client_secret" {
+  name         = "azure-client-secret"
+  value        = azuread_application_password.fhir_client_secret.value
+  key_vault_id = azurerm_key_vault.salthea_kv.id
+}
+
+resource "azurerm_key_vault_secret" "particle_webhook_secret" {
+  name         = "particle-webhook-secret"
+  value        = var.particle_webhook_secret_value
+  key_vault_id = azurerm_key_vault.salthea_kv.id
 } 

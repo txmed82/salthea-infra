@@ -52,17 +52,6 @@ output "storage_primary_blob_endpoint" {
   value       = azurerm_storage_account.salthea_storage.primary_blob_endpoint
 }
 
-# VNet outputs - DISABLED due to VNet removal
-# output "backend_subnet_id" {
-#   description = "ID of the backend subnet for VNet integration"
-#   value       = azurerm_subnet.backend_subnet.id
-# }
-
-# output "vnet_id" {
-#   description = "ID of the virtual network"
-#   value       = azurerm_virtual_network.salthea_vnet.id
-# }
-
 output "app_service_staging_url" {
   description = "URL of the staging slot"
   value       = "https://${azurerm_linux_web_app_slot.staging_slot.default_hostname}"

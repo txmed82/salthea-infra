@@ -232,7 +232,8 @@ resource "azurerm_linux_web_app_slot" "frontend_staging_slot" {
     CLERK_SECRET_KEY      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_secret.id})"
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.clerk_pub.id})"
     
-    NEXT_PUBLIC_API_URL = "https://${var.app_service_name}-staging.azurewebsites.net"
+    # Frontend staging should point to the same backend as production, not to a non-existent staging backend
+    NEXT_PUBLIC_API_URL = "https://${var.app_service_name}.azurewebsites.net"
     
     APPLICATIONINSIGHTS_CONNECTION_STRING = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.appinsights_connection.id})"
     AZURE_KEY_VAULT_ENDPOINT = azurerm_key_vault.salthea_kv.vault_uri

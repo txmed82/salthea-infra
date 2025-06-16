@@ -61,13 +61,17 @@ resource "azurerm_linux_web_app" "salthea_api" {
     VALYU_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.valyu_api_key.id})"
 
     # FHIR service configuration
-    FHIR_SERVICE_URL = "https://${var.fhir_service_name}.azurehealthcareapis.com"
-    TENANT_ID = data.azurerm_client_config.current.tenant_id
-    SMART_CLIENT_ID = azurerm_key_vault_secret.smart_client_id.value
+    AZURE_FHIR_URL      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.azure_fhir_url.id})"
+    AZURE_TENANT_ID     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.azure_tenant_id.id})"
+    AZURE_CLIENT_ID     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.azure_client_id.id})"
+    AZURE_CLIENT_SECRET = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.azure_client_secret.id})"
+    PARTICLE_WEBHOOK_SECRET = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_webhook_secret.id})"
+    SMART_CLIENT_ID     = azurerm_key_vault_secret.smart_client_id.value
     
     # TryTerra and Particle Health API settings
     PARTICLE_HEALTH_CLIENT_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_id.id})"
     PARTICLE_HEALTH_CLIENT_SECRET = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_secret.id})"
+    PARTICLE_HEALTH_BASE_URL   = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_base_url.id})"
     TRYTERRA_DEV_ID = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_dev_id.id})"
     TRYTERRA_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_api_key.id})"
 
@@ -156,13 +160,17 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.salthea_insights.connection_string
     
     # FHIR service configuration for staging
-    "FHIR_SERVICE_URL" = "https://${var.fhir_service_name}.azurehealthcareapis.com"
-    "TENANT_ID" = data.azurerm_client_config.current.tenant_id
-    "SMART_CLIENT_ID" = azurerm_key_vault_secret.smart_client_id.value
+    "AZURE_FHIR_URL"      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.azure_fhir_url.id})"
+    "AZURE_TENANT_ID"     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.azure_tenant_id.id})"
+    "AZURE_CLIENT_ID"     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.azure_client_id.id})"
+    "AZURE_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.azure_client_secret.id})"
+    "PARTICLE_WEBHOOK_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_webhook_secret.id})"
+    "SMART_CLIENT_ID"     = azurerm_key_vault_secret.smart_client_id.value
     
     # TryTerra and Particle Health API settings for staging
     "PARTICLE_HEALTH_CLIENT_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_id.id})"
     "PARTICLE_HEALTH_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_client_secret.id})"
+    "PARTICLE_HEALTH_BASE_URL"   = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.particle_health_base_url.id})"
     "TRYTERRA_DEV_ID" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_dev_id.id})"
     "TRYTERRA_API_KEY" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.tryterra_api_key.id})"
     
@@ -177,7 +185,7 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
     type = "SystemAssigned"
   }
 
-  virtual_network_subnet_id = azurerm_subnet.backend_subnet.id
+  # virtual_network_subnet_id = azurerm_subnet.backend_subnet.id  # Disabled (no VNet)
 
   tags = {
     environment = "staging"
@@ -187,8 +195,7 @@ resource "azurerm_linux_web_app_slot" "staging_slot" {
 
   depends_on = [
     azurerm_linux_web_app.salthea_api,
-    azurerm_key_vault_secret.staging_cosmos_connection,
-    azurerm_subnet.backend_subnet
+    azurerm_key_vault_secret.staging_cosmos_connection
   ]
 }
 
