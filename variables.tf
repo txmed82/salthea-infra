@@ -370,4 +370,35 @@ variable "particle_webhook_secret_value" {
   description = "HMAC secret Particle Health will use to sign webhook calls"
   type        = string
   sensitive   = true
+}
+
+# Azure Language Service Variables
+variable "language_service_name" {
+  description = "Name of the Azure Language Service (Cognitive Services)"
+  type        = string
+  default     = "salthea-language-service"
+}
+
+variable "language_service_sku" {
+  description = "SKU for the Azure Language Service (F0 for free tier, S for standard)"
+  type        = string
+  default     = "S"
+}
+
+variable "language_service_subdomain" {
+  description = "Custom subdomain for Azure Language Service (required for CLU)"
+  type        = string
+  default     = "salthea-language"
+}
+
+variable "clu_project_name" {
+  description = "Name of the CLU (Conversational Language Understanding) project"
+  type        = string
+  default     = "salthea-intent-routing"
+}
+
+variable "clu_deployment_name" {
+  description = "Name of the CLU deployment slot"
+  type        = string
+  default     = "production"
 } 
